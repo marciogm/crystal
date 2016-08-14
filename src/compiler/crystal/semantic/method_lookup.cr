@@ -24,12 +24,7 @@ module Crystal
       # and can be known by invoking `lookup_new_in_ancestors?`
       if my_parents && !(!lookup_new_in_ancestors? && is_new)
         my_parents.each do |parent|
-          # If this is a generic instance type and our parent is the generic class, use
-          # this type as the type lookup (so we can find type arguments)
-          path_lookup = parent
-          path_lookup = self if self.is_a?(GenericClassInstanceType) && path_lookup == self.generic_class
-
-          matches = parent.lookup_matches(signature, owner, path_lookup, matches_array)
+          matches = parent.lookup_matches(signature, owner, parent, matches_array)
           if matches.cover_all?
             return matches
           else
@@ -107,14 +102,9 @@ module Crystal
       # and can be known by invoking `lookup_new_in_ancestors?`
       if my_parents && !(!lookup_new_in_ancestors? && is_new)
         my_parents.each do |parent|
-          break unless parent.is_a?(IncludedGenericModule) || parent.module?
+          break unless parent.module?
 
-          # If this is a generic instance type and our parent is the generic class, use
-          # this type as the type lookup (so we can find type arguments)
-          path_lookup = parent
-          path_lookup = self if self.is_a?(GenericClassInstanceType) && path_lookup == self.generic_class
-
-          matches = parent.lookup_matches_with_modules(signature, owner, path_lookup, matches_array)
+          matches = parent.lookup_matches_with_modules(signature, owner, parent, matches_array)
           return matches unless matches.empty?
         end
       end

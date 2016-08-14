@@ -86,7 +86,7 @@ describe "Semantic: module" do
         include Foo(Int)
       end
       ",
-      "Foo is not a generic module"
+      "Foo is not a generic type"
   end
 
   it "includes module but wrong number of arguments" do
@@ -110,7 +110,7 @@ describe "Semantic: module" do
         include Foo
       end
       ",
-      "Foo(T) is a generic module"
+      "wrong number of type vars for Foo(T) (given 0, expected 1)"
   end
 
   it "includes generic module explicitly" do
@@ -735,6 +735,10 @@ describe "Semantic: module" do
       module Moo
         @x : Int32
 
+        def initialize
+          @x = 1
+        end
+
         def x
           @x
         end
@@ -742,10 +746,6 @@ describe "Semantic: module" do
 
       class Foo
         include Moo
-
-        def initialize
-          @x = 1
-        end
       end
 
       Foo.new.x
@@ -757,6 +757,9 @@ describe "Semantic: module" do
       module Moo
         @x : Int32
 
+        def initialize(@x)
+        end
+
         def moo
           @x = false
         end
@@ -766,19 +769,23 @@ describe "Semantic: module" do
         include Moo
 
         def initialize
+          super(1)
           @x = 1
         end
       end
 
       Foo.new.moo
       ),
-      "instance variable '@x' of Foo must be Int32"
+      "instance variable '@x' of Foo must be Int32, not Bool"
   end
 
   it "uses type declaration inside module, recursive, and gives error" do
     assert_error %(
       module Moo
         @x : Int32
+
+        def initialize(@x)
+        end
 
         def moo
           @x = false
@@ -793,6 +800,7 @@ describe "Semantic: module" do
         include Moo2
 
         def initialize
+          super(1)
           @x = 1
         end
       end

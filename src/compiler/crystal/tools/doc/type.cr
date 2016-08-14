@@ -24,10 +24,6 @@ class Crystal::Doc::Type
       :enum
     when NoReturnType, VoidType
       :struct
-    when InheritedGenericClass
-      :class
-    when IncludedGenericModule
-      :module
     else
       raise "Unhandled type in `kind`: #{@type}"
     end
@@ -43,10 +39,6 @@ class Crystal::Doc::Type
       "NoReturn"
     when VoidType
       "Void"
-    when InheritedGenericClass
-      type.extended_class.as(NamedType).name
-    when IncludedGenericModule
-      type.module.name
     when Const
       type.name
     else
@@ -58,10 +50,8 @@ class Crystal::Doc::Type
     case type = @type
     when GenericType
       type.type_vars
-    when InheritedGenericClass
-      type_mapping_values type
-    when IncludedGenericModule
-      type_mapping_values type
+    when GenericInstanceType
+      type.type_vars
     else
       nil
     end
@@ -87,22 +77,12 @@ class Crystal::Doc::Type
     parents_of?(type) || type.full_name == full_name
   end
 
-  private def type_mapping_values(type)
-    values = type.mapping.values
-    if values.any? &.is_a?(TypeOf)
-      values = values.map do |value|
-        value.is_a?(TypeOf) ? TypeOf.new([Var.new("...")] of ASTNode) : value
-      end
-    end
-    values
-  end
-
   def superclass
     case type = @type
     when ClassType
       superclass = type.superclass
-    when InheritedGenericClass
-      superclass = type.extended_class.superclass
+    when GenericClassInstanceType
+      superclass = type.superclass
     end
 
     if superclass
@@ -115,12 +95,6 @@ class Crystal::Doc::Type
   def ancestors
     ancestors = [] of self
     @type.ancestors.each do |ancestor|
-      case ancestor
-      when InheritedGenericClass
-        ancestor = ancestor.extended_class
-      when IncludedGenericModule
-        ancestor = ancestor.module
-      end
       ancestors << @generator.type(ancestor)
       break if ancestor == @generator.program.object
     end
@@ -275,7 +249,7 @@ class Crystal::Doc::Type
       parents = @type.parents || [] of Crystal::Type
       included_modules = [] of Type
       parents.each do |parent|
-        if parent.module? || parent.is_a?(IncludedGenericModule)
+        if parent.module?
           included_modules << @generator.type(parent)
         end
       end
@@ -290,7 +264,7 @@ class Crystal::Doc::Type
       parents = @type.metaclass.parents || [] of Crystal::Type
       extended_modules = [] of Type
       parents.each do |parent|
-        if parent.module? || parent.is_a?(IncludedGenericModule)
+        if parent.module?
           extended_modules << @generator.type(parent)
         end
       end
@@ -352,20 +326,11 @@ class Crystal::Doc::Type
   end
 
   def namespace
-    case type = @type
-    when NamedType
-      namespace = type.namespace
-      if namespace.is_a?(Program)
-        nil
-      else
-        @generator.type(namespace)
-      end
-    when IncludedGenericModule
-      @generator.type(type.module).namespace
-    when InheritedGenericClass
-      @generator.type(type.extended_class).namespace
-    else
+    namespace = type.namespace
+    if namespace.is_a?(Program)
       nil
+    else
+      @generator.type(namespace)
     end
   end
 
@@ -627,17 +592,17 @@ class Crystal::Doc::Type
   end
 
   def type_to_html(type : Crystal::GenericClassInstanceType, io, text = nil, links = true)
-    generic_class = @generator.type(type.generic_class)
-    if generic_class.must_be_included?
+    generic_type = @generator.type(type.generic_type)
+    if generic_type.must_be_included?
       if links
         io << %(<a href=")
-        io << generic_class.path_from(self)
+        io << generic_type.path_from(self)
         io << %(">)
       end
       if text
         io << text
       else
-        generic_class.full_name_without_type_vars(io)
+        generic_type.full_name_without_type_vars(io)
       end
       if links
         io << "</a>"
@@ -646,7 +611,7 @@ class Crystal::Doc::Type
       if text
         io << text
       else
-        generic_class.full_name_without_type_vars(io)
+        generic_type.full_name_without_type_vars(io)
       end
     end
     io << '('
